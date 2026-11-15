@@ -91,7 +91,7 @@ The schema is created automatically on first request (`lib/db.ts`); there are no
 
 ## Making changes
 
-All code changes go through a pull request: CI must pass and the owner merges. Settings changed outside Git (Vercel, Google, Neon) are recorded in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+All code changes go through a pull request: CI must pass and nothing merges without the owner's explicit approval. Settings changed outside Git (Vercel, Google, Neon) are recorded in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Local development
 

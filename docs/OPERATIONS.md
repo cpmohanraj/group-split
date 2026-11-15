@@ -6,7 +6,10 @@ Newest first. Each entry: **what**, **why**, **how to reverse**. Values of secre
 ## How changes are made
 
 - **Code:** branch → pull request → CI (typecheck, tests, build, `npm audit`) → Vercel preview build →
-  **merged by the repo owner on GitHub**. No direct pushes to `main`.
+  owner approves **in the Claude chat** ("approve #N") → Claude merges, and the merge commit records
+  `Approved-by: owner (chat)`. No direct pushes to `main`, and no merge without explicit approval of that PR number.
+  (GitHub does not let the PR author approve their own PR, and Claude's GitHub access acts as the owner, so the
+  approval lives in the merge commit rather than as a GitHub review.)
 - **Settings:** changed via the Vercel API or dashboard, and recorded here in the same PR as any related code
   (or in a docs-only PR).
 - **Secrets** (`GOOGLE_CLIENT_SECRET`, database credentials) are entered by the owner directly in Vercel as
@@ -45,7 +48,7 @@ database credentials. Owner to delete it (Vercel → Deployments → ⋯ → Del
 - `d0f6759` initial app (empty repo, no PR possible).
 - `4cb626e` Google sign-in + security hardening — branch `google-sign-in` fast-forwarded into `main` without a PR.
 - `f99d234` friendly "not configured" message — committed directly to `main`.
-- From this PR onwards all code changes go through pull requests merged by the owner.
+- From this PR onwards all code changes go through pull requests, merged only after the owner's explicit approval.
 
 ### 2026-11-15 — Initial setup
 - Owner: Vercel project `group-split` imported from GitHub; Neon Postgres connected via Vercel Storage.
