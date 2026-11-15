@@ -19,6 +19,7 @@ const SIGNIN_ERRORS: Record<string, string> = {
   expired: "That sign-in attempt expired. Please try again.",
   cancelled: "Sign-in was cancelled.",
   failed: "Sign-in failed. Please try again.",
+  setup: "Google sign-in isn't set up yet. The admin needs to finish configuration.",
 };
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
