@@ -112,7 +112,7 @@ export function EventForm({ people, draft, meId, onDone }: { people: Person[]; d
             <select
               aria-label="Split"
               value={l.splitMode}
-              style={{ width: "auto", minHeight: 36, padding: "6px 10px", fontSize: 14 }}
+              className="compact"
               onChange={(e) => update(l.key, { splitMode: e.target.value as SplitMode, sharers: l.sharers.length ? l.sharers : attendees })}
             >
               <option value="attendees">Split among players</option>
@@ -125,7 +125,7 @@ export function EventForm({ people, draft, meId, onDone }: { people: Person[]; d
             )}
           </div>
           {l.splitMode === "selected" && (
-            <div style={{ marginTop: 10 }}>
+            <div className="mt10">
               <Chips small people={people} selected={l.sharers} onToggle={(id) => update(l.key, { sharers: toggle(l.sharers, id) })} />
             </div>
           )}
@@ -140,7 +140,7 @@ export function EventForm({ people, draft, meId, onDone }: { people: Person[]; d
       </button>
 
       {preview.length > 0 && (
-        <p className="small muted" style={{ margin: "12px 0 0" }}>
+        <p className="small muted line12">
           {preview.map((p) => `${p.name} ${money(p.cents)}`).join(" · ")}
         </p>
       )}

@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { balances, eventShares, settleUp, type LedgerEvent, type SplitMode, type Transfer } from "./ledger";
 
-export type MemberRow = { id: number; name: string; email: string | null; is_admin: boolean; active: boolean };
+export type MemberRow = { id: number; name: string; email: string | null; is_admin: boolean; active: boolean; linked: boolean };
 export type ExpenseRow = {
   id: number;
   description: string;
@@ -44,7 +44,7 @@ export type AppState = {
 export async function loadState(): Promise<AppState> {
   const sql = await db();
   const [members, events, attendance, expenses, shares, payments] = await Promise.all([
-    sql<MemberRow[]>`select id, name, email, is_admin, active from members order by active desc, lower(name)`,
+    sql<MemberRow[]>`select id, name, email, is_admin, active, google_sub is not null as linked from members order by active desc, lower(name)`,
     sql<{ id: number; held_on: string; note: string; created_by: number | null; updated_by: number | null }[]>`
       select id, held_on::text, note, created_by, updated_by from events order by held_on desc, id desc`,
     sql<{ event_id: number; member_id: number }[]>`select event_id, member_id from attendance`,

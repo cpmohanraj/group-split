@@ -17,51 +17,83 @@ A tiny, single-page app for a small group (≲10 people) to share the cost of a 
 
 ## Security
 
-- **Sign-in by email magic link.** Only emails an admin has added can sign in. The login screen gives the same response for any email, so it doesn't reveal who's in the group.
-- Tokens are 256-bit random, stored **hashed** (SHA-256), single-use, and expire after 15 minutes. Opening the link shows a *Continue* button (POST), so email link-scanners can't use up the token.
-- Rate limits: 3 links per person and 30 in total per 15 minutes.
-- Session cookie: `__Host-` prefixed, `HttpOnly`, `Secure`, `SameSite=Lax`, 60 days, stored hashed server-side. Deactivating someone or changing their email signs them out everywhere.
-- Every server action checks the session. All input is validated on the server, and database constraints back that up.
-- Links are built from `APP_URL`, never from the request's Host header, so a forged Host header can't redirect them.
-- Security headers: CSP, HSTS, `X-Frame-Options: DENY`, and `Referrer-Policy: no-referrer` (so the token can't leak through the Referer header). Pages are `noindex`.
-- **Trust model:** any signed-in member can add or edit sessions and payments (it's a group of friends), and every change is written to `audit_log` with who made it. Only admins can manage people.
+**Sign-in: Google (OpenID Connect), invite-only.**
+- Only emails an admin has added under *People* can get in. Anyone else gets "not in the group".
+- Authorization-code flow with **PKCE (S256)**, a random **state** (bound to the browser by a 10-minute `__Host-` HttpOnly cookie, which stops login CSRF) and a **nonce**.
+- The ID token's **RS256 signature is verified** against Google's published keys. This isn't strictly required for a token received directly over TLS, but it's done as defence in depth.
+- The token's `iss`, `aud` (exactly our client id), `exp`/`iat`, `nonce` and `email_verified` claims are all checked. These checks are unit-tested in `test/oidc.test.ts`.
+- **Account pinning:** on first sign-in a member is bound to Google's stable account id (`sub`). After that, only that exact Google account can sign in as them, even if the email address is later recycled or transferred. Admins can *Reset Google link* if someone legitimately changes account.
+- No passwords and no mail credentials are stored. The Google client secret only identifies this app to Google; it gives no access to anyone's Google account.
+
+**Sessions**
+- Random 256-bit id, stored only as a SHA-256 hash.
+- Cookie is `__Host-sid`, with `HttpOnly`, `Secure` and `SameSite=Lax` set. Sessions last 30 days.
+- Deactivating someone, changing their email or resetting their Google link signs them out everywhere.
+
+**Application**
+- Every server action re-checks the session, and admin-only actions also check the role.
+- All input is validated on the server and backed by database constraints (`CHECK`, foreign keys).
+- Queries are parameterised throughout (postgres.js tagged templates).
+- Money is stored as integer cents.
+- Next.js server actions reject cross-origin requests (Origin/Host check).
+- Every change and every sign-in is written to `audit_log` with who did it.
+
+**Browser hardening**
+- **Strict nonce-based CSP**, with a fresh nonce on every request (`proxy.ts`):
+  - `script-src 'nonce-…' 'strict-dynamic'`
+  - `style-src 'self' 'nonce-…'` (no inline styles anywhere)
+  - `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'`, `form-action 'self'`
+- Other headers:
+  - HSTS (2 years, preload)
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `Referrer-Policy: no-referrer`
+  - COOP/CORP `same-origin`
+  - a restrictive `Permissions-Policy`
+  - `noindex`
+- No third-party scripts, fonts or trackers.
+
+**Supply chain:** five runtime dependencies (next, react, react-dom, postgres, server-only), with exact versions pinned and a lockfile.
+
+**Trust model:** any signed-in member can add or edit sessions and payments (it's a group of friends). Everything is in the audit log. Only admins manage people.
+
+**Known limitations**
+- Sign-in only works on the production URL, because Google redirect URIs must match exactly. Preview deployments are additionally behind Vercel Authentication.
+- With the Neon integration's defaults, preview deployments share the production database.
 
 ## Data model (Postgres)
 
-`members` · `events` (sessions) · `attendance` · `expenses` · `expense_shares` · `payments` · `audit_log` · `login_tokens` · `login_sessions`
+`members` (incl. `google_sub`) · `events` (sessions) · `attendance` · `expenses` · `expense_shares` · `payments` · `audit_log` · `login_sessions`
 
 The schema is created automatically on first request (`lib/db.ts`); there are no migration steps to run. `ADMIN_EMAIL` is upserted as an admin on each cold start.
 
-## Deploy to Vercel (≈10 minutes, free tiers)
+## Deploy to Vercel (free tiers)
 
-1. **Import the repo:** vercel.com → *Add New… → Project* → import this GitHub repo. Accept the defaults (Next.js).
-2. **Add a database:** in the project → *Storage* → *Create Database* → **Neon (Postgres)** → connect it to the project. This sets `DATABASE_URL` for you.
-3. **Set environment variables** (*Settings → Environment Variables*):
-
-   | Name | Example | Notes |
-   |---|---|---|
-   | `ADMIN_EMAIL` | `you@gmail.com` | You, the first admin |
-   | `ADMIN_NAME` | `Raj` | |
-   | `APP_URL` | `https://your-app.vercel.app` | Your production URL |
-   | `GROUP_NAME` | `Pickleball` | Shown in header & emails |
-   | `NEXT_PUBLIC_CURRENCY` | `AUD` | |
-   | `TIMEZONE` | `Australia/Perth` | Used for "today" |
-   | `SMTP_HOST` | `smtp.gmail.com` | |
-   | `SMTP_PORT` | `465` | |
-   | `SMTP_USER` | `you@gmail.com` | |
-   | `SMTP_PASS` | *Gmail App Password* | Google Account → Security → 2-Step Verification → App passwords |
-   | `MAIL_FROM` | `Pickleball <you@gmail.com>` | |
-
-   > Why SMTP rather than Resend? Resend's free tier only sends to *your own* address until you verify a domain you own. A Gmail App Password works for anyone, for free. If you own a domain, Resend's SMTP (`smtp.resend.com`, user `resend`, pass = API key) also works with the same variables.
-
-4. **Redeploy** so the variables take effect, then open the URL, enter your admin email and click the link.
-5. **Add your group** under *People* (name + email). People without an email can still be tracked; they just can't sign in.
+1. **Import the repo:** in Vercel go to *Add New → Project* and import this repo (Next.js defaults).
+2. **Add a database:** project → *Storage* → *Create* → **Neon**, then connect it to the project. This sets `DATABASE_URL`.
+3. **Create the Google OAuth client** in [Google Cloud Console](https://console.cloud.google.com/):
+   1. Create a project, e.g. `group-split`.
+   2. Go to *Google Auth Platform → Branding*. Set the app name and support email.
+   3. Go to *Audience*. Choose **External**, then **Publish app**. Only the basic `openid email profile` scopes are used, so Google doesn't require app verification.
+   4. Go to *Clients → Create client → Web application*.
+   5. Under *Authorised redirect URIs* add `https://<your-domain>/auth/google/callback`.
+4. **Set environment variables** under *Settings → Environment Variables*:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`, marked **Sensitive**
+   - `APP_URL`, e.g. `https://<your-domain>`
+   - `ADMIN_EMAIL`: your Google account email
+   - `ADMIN_NAME`
+   - `GROUP_NAME`
+   - `NEXT_PUBLIC_CURRENCY`, e.g. `AUD`
+   - `TIMEZONE`, e.g. `Australia/Perth`
+5. **Redeploy**, then open the site and choose *Sign in with Google*.
+6. Add your group under *People*. Use each person's **Google account email**. People without an email can still be tracked; they just can't sign in.
 
 ## Local development
 
 ```bash
 cp .env.example .env.local   # set DATABASE_URL to a local or Neon dev database
 npm install
-npm run dev                  # with no SMTP_HOST, sign-in links are printed to the console
+DEV_LOGIN=1 npm run dev      # then open /auth/dev?email=<a member's email> (dev only)
 npm test                     # ledger unit tests
 ```

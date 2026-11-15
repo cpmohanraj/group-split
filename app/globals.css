@@ -124,3 +124,23 @@ details.session .body { padding: 0 0 14px; }
 .center { min-height: 80vh; display: grid; place-items: center; }
 .center .card { width: 100%; max-width: 380px; }
 .center h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
+
+/* utilities (no inline styles: strict CSP) */
+.mt0 { margin-top: 0; }
+.mt10 { margin-top: 10px; }
+.mt14 { margin-top: 14px; }
+.mt18 { margin-top: 18px; }
+.line4 { margin: 4px 0 0; }
+.line10 { margin: 10px 0 0; }
+.line12 { margin: 12px 0 0; }
+.rows li.block { display: block; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+select.compact { width: auto; min-height: 36px; padding: 6px 10px; font-size: 14px; }
+label.check { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; color: var(--text); }
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+  background: var(--card); color: var(--text); border: 1px solid var(--line); text-decoration: none;
+  border-radius: 10px; padding: 12px 16px; font-weight: 600; min-height: 48px;
+}
+.btn-google:hover { border-color: var(--muted); }
+.btn-google svg { width: 18px; height: 18px; flex: none; }

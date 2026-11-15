@@ -16,11 +16,11 @@ export function MemberForm({ member }: { member?: M }) {
           <input id={`mn${k}`} name="name" defaultValue={member?.name} maxLength={60} required />
         </div>
         <div className="field">
-          <label htmlFor={`me${k}`}>Email (to sign in)</label>
+          <label htmlFor={`me${k}`}>Google email (to sign in)</label>
           <input id={`me${k}`} name="email" type="email" defaultValue={member?.email ?? ""} placeholder="optional" />
         </div>
       </div>
-      <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+      <label className="check">
         <input type="checkbox" name="isAdmin" defaultChecked={member?.is_admin} /> Admin (can manage people)
       </label>
       <button type="submit" className="sm" disabled={pending}>{pending ? "Saving…" : member ? "Save" : "Add person"}</button>

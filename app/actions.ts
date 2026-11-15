@@ -3,9 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { audit, db } from "@/lib/db";
-import { consumeLoginToken, endAllSessionsFor, endSession, issueLoginToken, requireMember } from "@/lib/auth";
-import { sendLoginEmail } from "@/lib/mail";
-import { appUrl } from "@/lib/config";
+import { endAllSessionsFor, endSession, requireMember } from "@/lib/auth";
 import { parseAmount, type SplitMode } from "@/lib/ledger";
 
 export type FormState = { error?: string; ok?: string } | null;
@@ -17,30 +15,7 @@ const int = (v: unknown) => (typeof v === "number" ? v : Number(v));
 const isId = (v: unknown) => Number.isInteger(int(v)) && int(v) > 0;
 const validDate = (d: string) => DATE_RE.test(d) && !Number.isNaN(Date.parse(d + "T00:00:00Z"));
 
-/* ---------- Sign in / out ---------- */
-
-export async function requestLogin(_: FormState, fd: FormData): Promise<FormState> {
-  const email = str(fd.get("email"), 254).toLowerCase();
-  if (!EMAIL_RE.test(email)) return { error: "Please enter a valid email address." };
-  try {
-    const issued = await issueLoginToken(email);
-    if (issued) {
-      const link = `${appUrl()}/auth/verify?token=${issued.token}`;
-      await sendLoginEmail(email, issued.name, link);
-    }
-  } catch (e) {
-    console.error("login request failed", e);
-    return { error: "Couldn't send the email just now. Please try again shortly." };
-  }
-  // Same answer either way: don't reveal who is in the group.
-  return { ok: "If that email is in the group, a sign-in link is on its way. Check your inbox." };
-}
-
-export async function confirmLogin(_: FormState, fd: FormData): Promise<FormState> {
-  const ok = await consumeLoginToken(str(fd.get("token"), 100));
-  if (!ok) return { error: "That link has expired or was already used. Request a new one." };
-  redirect("/");
-}
+/* ---------- Sign out ---------- */
 
 export async function signOut() {
   await endSession();
@@ -209,8 +184,11 @@ export async function saveMember(_: FormState, fd: FormData): Promise<FormState>
       } else {
         const [before] = await tx<{ email: string | null }[]>`select email from members where id = ${id}`;
         await tx`update members set name = ${name}, email = ${email}, is_admin = ${isAdmin} where id = ${id}`;
-        // Changing someone's email signs them out everywhere.
-        if (before && before.email !== email) await tx`delete from login_sessions where member_id = ${id}`;
+        // A new email means a (possibly) different person: unbind their Google account and sign them out.
+        if (before && before.email !== email) {
+          await tx`update members set google_sub = null where id = ${id}`;
+          await tx`delete from login_sessions where member_id = ${id}`;
+        }
         await audit(tx, me.id, "member.update", { id, name, email, isAdmin });
       }
     });
@@ -233,4 +211,16 @@ export async function setMemberActive(id: number, active: boolean): Promise<Form
   await audit(sql, me.id, active ? "member.activate" : "member.deactivate", { id });
   revalidatePath("/");
   return { ok: active ? "Reactivated" : "Deactivated" };
+}
+
+export async function resetGoogleLink(id: number): Promise<FormState> {
+  const me = await requireMember();
+  if (!me.is_admin) return { error: "Only admins can manage people." };
+  if (!isId(id)) return { error: "Invalid person." };
+  const sql = await db();
+  await sql`update members set google_sub = null where id = ${id}`;
+  await endAllSessionsFor(id);
+  await audit(sql, me.id, "member.reset_google", { id });
+  revalidatePath("/");
+  return { ok: "Reset" };
 }

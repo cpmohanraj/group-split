@@ -31,14 +31,9 @@ create table if not exists members (
   created_at  timestamptz not null default now()
 );
 
-create table if not exists login_tokens (
-  token_hash  text primary key,
-  member_id   int not null references members(id) on delete cascade,
-  expires_at  timestamptz not null,
-  used_at     timestamptz,
-  created_at  timestamptz not null default now()
-);
-create index if not exists login_tokens_created on login_tokens (created_at);
+-- Stable Google account id, bound on first sign-in.
+alter table members add column if not exists google_sub text unique;
+drop table if exists login_tokens;
 
 create table if not exists login_sessions (
   token_hash  text primary key,
