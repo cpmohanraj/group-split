@@ -89,6 +89,10 @@ The schema is created automatically on first request (`lib/db.ts`); there are no
 5. **Redeploy**, then open the site and choose *Sign in with Google*.
 6. Add your group under *People*. Use each person's **Google account email**. People without an email can still be tracked; they just can't sign in.
 
+## Making changes
+
+All code changes go through a pull request: CI must pass and the owner merges. Settings changed outside Git (Vercel, Google, Neon) are recorded in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
 ## Local development
 
 ```bash
